@@ -64,19 +64,19 @@ class VrepEnv:
             vrep.simxSetBooleanParameter(self.__ID, vrep.sim_boolparam_display_enabled, False, vrep.simx_opmode_oneshot)
         # constant shared with lua
         self.DT = vrep.simxGetFloatSignal(self.__ID, "dt", vrep.simx_opmode_blocking)[1]
-        self.LIMIT_STATE = np.array(vrep.simxUnpackFloats(vrep.simxGetStringSignal(self.__ID, "limit_state", vrep.simx_opmode_blocking)[1]))
-        self.LIMIT_ACTION = np.array(vrep.simxUnpackFloats(vrep.simxGetStringSignal(self.__ID, "limit_action", vrep.simx_opmode_blocking)[1]))
-        self.SIZE_STATE = len(self.LIMIT_STATE)
-        self.SIZE_ACTION = len(self.LIMIT_ACTION)
+        max_state = np.array(vrep.simxUnpackFloats(vrep.simxGetStringSignal(self.__ID, "max_state", vrep.simx_opmode_blocking)[1]))
+        max_action = np.array(vrep.simxUnpackFloats(vrep.simxGetStringSignal(self.__ID, "max_action", vrep.simx_opmode_blocking)[1]))
+        min_state = np.array(vrep.simxUnpackFloats(vrep.simxGetStringSignal(self.__ID, "min_state", vrep.simx_opmode_blocking)[1]))
+        min_action = np.array(vrep.simxUnpackFloats(vrep.simxGetStringSignal(self.__ID, "min_action", vrep.simx_opmode_blocking)[1]))
         # limits of respective states and action
-        self.observation_space = SpaceInfo(-self.LIMIT_STATE, self.LIMIT_STATE)
-        self.action_space = SpaceInfo(-self.LIMIT_ACTION, self.LIMIT_ACTION)
+        self.observation_space = SpaceInfo(min_state, max_state)
+        self.action_space = SpaceInfo(min_action, max_action)
         # variables will be received
-        self.state = np.zeros(self.SIZE_STATE)
+        self.state = np.zeros(len(max_state))
         self.reward = 0.0
         self.done = False
         # variables will be sended
-        self.action = np.zeros(self.SIZE_ACTION)
+        self.action = np.zeros(len(max_action))
         # enable streaming
         self.state = np.array( vrep.simxUnpackFloats( vrep.simxGetStringSignal(self.__ID, "states", vrep.simx_opmode_streaming)[1] ) )
         self.reward = vrep.simxGetFloatSignal(self.__ID, "reward", vrep.simx_opmode_streaming)[1]
@@ -102,10 +102,10 @@ class VrepEnv:
 
     def reset(self):
         self.__stop()
-        self.state = np.zeros(self.SIZE_STATE)
+        self.state = np.zeros_like(self.state)
         self.reward = 0.0
         self.done = False
-        self.action = np.zeros(self.SIZE_ACTION)
+        self.action = np.zeros_like(self.action)
         if self.IS_RECORD:
             self.__move()
             vrep.simxSetBooleanParameter(self.__ID, vrep.sim_boolparam_video_recording_triggered, True, vrep.simx_opmode_oneshot)
@@ -134,7 +134,7 @@ class VrepEnv:
         if not os.path.isdir(save_dir):
             os.mkdir(save_dir)
         if force:
-            self.videoName = save_dir + "/recording.mp4"
+            self.videoName = save_dir + "/recording"
         else:
             self.videoName = save_dir + "/"
 
@@ -147,7 +147,7 @@ class VrepEnv:
             pass
 
     def __set(self, action):
-        self.action = np.clip(action, -self.LIMIT_ACTION, self.LIMIT_ACTION)    # not necessary?
+        self.action = np.clip(action, self.action_space.low, self.action_space.high)
         vrep.simxSetStringSignal(self.__ID, "actions", vrep.simxPackFloats(self.action), vrep.simx_opmode_oneshot)
 
     def __get(self):
@@ -158,8 +158,9 @@ class VrepEnv:
 
     def __move(self):
         for f in os.listdir(self.VREP_DIR):
-            if "recording_" in f and ".mp4" in f:
+            if "recording_" in f:
                 if self.videoName[-1] == "/":
                     shutil.move(self.VREP_DIR + f, self.videoName + f)
                 else:
-                    shutil.move(self.VREP_DIR + f, self.videoName)
+                    name , ext = os.path.splitext(f)
+                    shutil.move(self.VREP_DIR + f, self.videoName + ext)
