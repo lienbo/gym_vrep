@@ -5,15 +5,8 @@ import sys
 import shutil
 import subprocess
 import numpy as np
-
-class SpaceInfo:
-    def __init__(self, low, high, shape=None):
-        if shape is None:
-            self.shape = low.shape
-        else:
-            self.shape = shape
-        self.low = np.array([low]).reshape(self.shape)
-        self.high = np.array([high]).reshape(self.shape)
+import gym
+from gym import spaces
 
 ######################################################
 class VrepEnv:
@@ -69,8 +62,8 @@ class VrepEnv:
         min_state = np.array(vrep.simxUnpackFloats(vrep.simxGetStringSignal(self.__ID, "min_state", vrep.simx_opmode_blocking)[1]))
         min_action = np.array(vrep.simxUnpackFloats(vrep.simxGetStringSignal(self.__ID, "min_action", vrep.simx_opmode_blocking)[1]))
         # limits of respective states and action
-        self.observation_space = SpaceInfo(min_state, max_state)
-        self.action_space = SpaceInfo(min_action, max_action)
+        self.observation_space = spaces.Box(min_state, max_state)
+        self.action_space = spaces.Box(min_action, max_action)
         # variables will be received
         self.state = np.zeros(len(max_state))
         self.reward = 0.0
