@@ -34,3 +34,5 @@ for epi in range(n_episode):
     observation, reward, done, info = env.step(action)
 env.close()
 ```
+
+** If vrep process is already running, please set `is_boot=False`. **
